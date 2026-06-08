@@ -223,7 +223,7 @@ class AnisetteService {
 			"X-Apple-I-MD-LU": v1Device.localUserUUID,
 			"X-Apple-I-SRL-NO": "0",
 			"X-MMe-Client-Info": v1Device.serverFriendlyDescription,
-			"X-Apple-I-TimeZone": time.timezone.dstName,
+			"X-Apple-I-TimeZone": "Europe/Paris",
 			"X-Apple-Locale": "fr_FR",
 			"X-Mme-Device-Id": v1Device.uniqueDeviceIdentifier,
 		];

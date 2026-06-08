@@ -194,14 +194,22 @@ class AnisetteService {
 		import core.time;
 		auto log = getLogger();
 		log.info("[<<] anisette-v1 request");
+		log.debugF!"[<<] client address: %s"(req.clientAddress.toString());
+		log.debugF!"[<<] user-agent: %s"(req.headers.get("User-Agent", "(none)"));
+		debug {
+			foreach (name, value; req.headers) {
+				log.debugF!"[<<] header: %s: %s"(name, value);
+			}
+		}
 		auto time = Clock.currTime();
 
 		if (!v1Adi.isMachineProvisioned(dsId)) {
+			log.info("Machine not provisioned, provisioning now...");
 			ProvisioningSession provisioningSession = new ProvisioningSession(v1Adi, v1Device);
 			provisioningSession.provision(dsId);
 			log.info("Provisioning done!");
 		}
-		
+
 		auto otp = v1Adi.requestOTP(dsId);
 
 		import std.conv;
@@ -220,9 +228,11 @@ class AnisetteService {
 			"X-Mme-Device-Id": v1Device.uniqueDeviceIdentifier,
 		];
 
+		auto body = responseJson.toString(JSONOptions.doNotEscapeSlashes);
 		res.headers["Implementation-Version"] = brandingCode;
-		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+		res.writeBody(body, "application/json");
 		log.infoF!"[>>] 200 OK %s"(responseJson);
+		log.debugF!"[>>] raw body: %s"(body);
 	}
 
 	@method(HTTPMethod.GET)
@@ -230,13 +240,17 @@ class AnisetteService {
 	void getClientInfo(HTTPServerRequest req, HTTPServerResponse res) {
 		auto log = getLogger();
 		log.info("[<<] anisette-v3 /v3/client_info");
+		log.debugF!"[<<] client address: %s"(req.clientAddress.toString());
+		log.debugF!"[<<] user-agent: %s"(req.headers.get("User-Agent", "(none)"));
 		JSONValue responseJson = [
 			"client_info": clientInfo,
 			"user_agent": "akd/1.0 CFNetwork/808.1.4"
 		];
 
+		auto body = responseJson.toString(JSONOptions.doNotEscapeSlashes);
 		res.headers["Implementation-Version"] = brandingCode;
-		res.writeBody(responseJson.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+		res.writeBody(body, "application/json");
+		log.debugF!"[>>] response: %s"(body);
 	}
 
 	@method(HTTPMethod.POST)
@@ -244,14 +258,18 @@ class AnisetteService {
 	void getHeaders(HTTPServerRequest req, HTTPServerResponse res) {
 		auto log = getLogger();
 		log.info("[<<] anisette-v3 /v3/get_headers");
+		log.debugF!"[<<] client address: %s"(req.clientAddress.toString());
+		log.debugF!"[<<] content-type: %s"(req.headers.get("Content-Type", "(none)"));
 		string identifier = "(null)";
 		string tmpProvisioningPath;
 		try {
 			import std.uuid;
 			auto json = req.json();
+			log.debugF!"[<<] request body keys: %s"(json.object.keys);
 			ubyte[] identifierBytes = Base64.decode(json["identifier"].to!string());
 			ubyte[] adi_pb = Base64.decode(json["adi_pb"].to!string());
 			identifier = UUID(identifierBytes[0..16]).toString();
+			log.debugF!"[<<] identifier: %s, adi_pb size: %d bytes"(identifier, adi_pb.length);
 			tmpProvisioningPath = provisioningPath.buildPath(identifier);
 
 			if (file.exists(tmpProvisioningPath)) {
@@ -280,17 +298,20 @@ class AnisetteService {
 				"X-Apple-I-MD-M": Base64.encode(otp.machineIdentifier),
 				"X-Apple-I-MD-RINFO": "17106176",
 			];
+			auto body = response.toString(JSONOptions.doNotEscapeSlashes);
 			res.headers["Implementation-Version"] = brandingCode;
-			res.writeBody(response.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+			res.writeBody(body, "application/json");
 			log.info("[>>] anisette-v3 /v3/get_headers OK.");
+			log.debugF!"[>>] response: %s"(body);
 		} catch (Throwable t) {
 			JSONValue error = [
 				"result": "GetHeadersError",
 				"message": typeid(t).name ~ ": " ~ t.msg
 			];
+			auto errBody = error.toString(JSONOptions.doNotEscapeSlashes);
 			res.headers["Implementation-Version"] = brandingCode;
-			log.info("[>>] anisette-v3 /v3/get_headers error.");
-			res.writeBody(error.toString(JSONOptions.doNotEscapeSlashes), "application/json");
+			log.errorF!"[>>] anisette-v3 /v3/get_headers error: %s: %s"(typeid(t).name, t.msg);
+			res.writeBody(errBody, "application/json");
 		} finally {
 			if (file.exists(tmpProvisioningPath)) {
 				file.rmdirRecurse(tmpProvisioningPath);

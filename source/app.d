@@ -265,7 +265,7 @@ class AnisetteService {
 		try {
 			import std.uuid;
 			auto json = req.json();
-			log.debugF!"[<<] request body keys: %s"(json.object.keys);
+			log.debugF!"[<<] request body: %s"(json.toString());
 			ubyte[] identifierBytes = Base64.decode(json["identifier"].to!string());
 			ubyte[] adi_pb = Base64.decode(json["adi_pb"].to!string());
 			identifier = UUID(identifierBytes[0..16]).toString();
